@@ -112,6 +112,16 @@ environment:
   - UPLOAD_MAX_VIDEO_MB=500
 ```
 
+### Archive Limits
+
+Applies to folder and whole-vault ZIP downloads (`GET /api/archive`).
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `ARCHIVE_MAX_FOLDER_MB` | integer | `500` | Largest folder (or whole vault) that will be zipped, measured on the files going in. Requests over the limit are refused with a `413` before any work starts |
+
+Zipping runs at roughly 100 MB/s and needs that much free temp disk while the archive is built, so raise this only if you are happy to wait for a bigger vault.
+
 ### User Interface
 
 | Variable | Type | Default | Description |
