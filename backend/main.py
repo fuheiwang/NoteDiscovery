@@ -23,7 +23,7 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional
 from html import escape as html_escape
-from urllib.parse import quote_plus, parse_qs
+from urllib.parse import quote_plus, parse_qs, urlparse
 import hashlib
 import aiofiles
 from datetime import datetime
@@ -332,6 +332,36 @@ if not get_theme_css(str(THEMES_DIR), DEFAULT_THEME):
     DEFAULT_THEME = 'light'
 else:
     logger.info("Default theme: %s (from %s)", DEFAULT_THEME, _theme_source)
+
+# Optional public origin for share links. When set, create/status share URLs use
+# this instead of request.base_url (and the frontend prefers it over
+# window.location.origin). Empty = current behavior.
+# Priority: SHARE_PUBLIC_ORIGIN env var > server.share_public_origin in config.yaml.
+def _normalize_share_public_origin(raw: str) -> str:
+    """Return scheme://host[:port] or '' if unset/invalid."""
+    value = (raw or '').strip()
+    if not value:
+        return ''
+    parsed = urlparse(value)
+    if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+        return ''
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+_share_origin_source = "config.yaml"
+if os.environ.get('SHARE_PUBLIC_ORIGIN', '').strip():
+    _share_origin_raw = os.environ['SHARE_PUBLIC_ORIGIN']
+    _share_origin_source = "SHARE_PUBLIC_ORIGIN env var"
+else:
+    _share_origin_raw = config.get('server', {}).get('share_public_origin') or ''
+SHARE_PUBLIC_ORIGIN = _normalize_share_public_origin(_share_origin_raw)
+if (_share_origin_raw or '').strip() and not SHARE_PUBLIC_ORIGIN:
+    logger.warning(
+        "Configured share_public_origin %r (from %s) is not a valid http(s) URL; ignoring",
+        _share_origin_raw.strip(),
+        _share_origin_source,
+    )
+elif SHARE_PUBLIC_ORIGIN:
+    logger.info("Share public origin: %s (from %s)", SHARE_PUBLIC_ORIGIN, _share_origin_source)
 
 if DEMO_MODE:
     # Enable rate limiting for demo deployments
@@ -725,6 +755,8 @@ async def get_config():
         "autosaveDelayMs": AUTOSAVE_DELAY_MS,  # Debounce for note/drawing autosave
         "defaultTheme": DEFAULT_THEME,  # Used when the browser has no saved preference
         "uploadMaxNoteMb": UPLOAD_MAX_NOTE_MB,  # Client-side size cap for .md drops
+        # Empty string when unset; frontend falls back to window.location.origin
+        "sharePublicOrigin": SHARE_PUBLIC_ORIGIN,
         "authentication": {
             "enabled": config.get('authentication', {}).get('enabled', False)
         }
@@ -1919,6 +1951,18 @@ async def get_stats(request: Request):
 # Share Token Endpoints (authenticated)
 # ============================================================================
 
+def _share_base_url(request: Request) -> str:
+    """Origin used when building share links for the API response.
+
+    Prefer SHARE_PUBLIC_ORIGIN when configured so API consumers (and the UI
+    before _localizeShareUrl runs) see the public host. Otherwise use the
+    request's base URL as before.
+    """
+    if SHARE_PUBLIC_ORIGIN:
+        return SHARE_PUBLIC_ORIGIN
+    return str(request.base_url).rstrip('/')
+
+
 @api_router.post("/share/{note_path:path}", tags=["Sharing"])
 @limiter.limit("30/minute")
 async def create_share(request: Request, note_path: str, data: dict = None):
@@ -1965,8 +2009,7 @@ async def create_share(request: Request, note_path: str, data: dict = None):
             raise HTTPException(status_code=500, detail="Failed to create share token")
         
         # Build share URL
-        base_url = str(request.base_url).rstrip('/')
-        share_url = f"{base_url}/share/{token}"
+        share_url = f"{_share_base_url(request)}/share/{token}"
         
         return {
             "success": True,
@@ -1999,8 +2042,7 @@ async def get_share_status(request: Request, note_path: str):
         info = get_share_info(notes_dir, note_path)
         
         if info.get('shared'):
-            base_url = str(request.base_url).rstrip('/')
-            info['url'] = f"{base_url}/share/{info['token']}"
+            info['url'] = f"{_share_base_url(request)}/share/{info['token']}"
         
         return info
     except Exception as e:
