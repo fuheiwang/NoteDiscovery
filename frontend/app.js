@@ -291,6 +291,8 @@ function noteApp() {
         autosaveDelayMs: CONFIG.AUTOSAVE_DELAY,  // hydrated from /api/config in loadConfig()
         defaultTheme: CONFIG.DEFAULT_THEME,      // hydrated from /api/config in loadConfig()
         uploadMaxNoteMb: CONFIG.UPLOAD_MAX_NOTE_MB, // hydrated from /api/config in loadConfig()
+        // Optional public origin for share links; empty keeps window.location.origin.
+        sharePublicOrigin: '',
         notes: [],
 
         // True while /api/notes is in flight. Drives the "Loading your vault…"
@@ -1049,6 +1051,9 @@ function noteApp() {
                 }
                 if (Number.isFinite(config.uploadMaxNoteMb) && config.uploadMaxNoteMb > 0) {
                     this.uploadMaxNoteMb = config.uploadMaxNoteMb;
+                }
+                if (typeof config.sharePublicOrigin === 'string' && config.sharePublicOrigin) {
+                    this.sharePublicOrigin = config.sharePublicOrigin;
                 }
             } catch (error) {
                 console.error('Failed to load config:', error);
@@ -8340,17 +8345,21 @@ function noteApp() {
          * the note is reachable only over https. The browser is authoritative for the
          * scheme and host it is currently on, so adopt those two and keep the server's
          * path, which may carry a deployment prefix the frontend cannot infer.
+         *
+         * When sharePublicOrigin is configured (LAN browse, public share host), prefer
+         * that origin instead so the dialog / QR / clipboard show the outbound URL.
          */
         _localizeShareUrl(info) {
             if (!info || typeof info.url !== 'string' || !info.url) return info;
             try {
                 const src = new URL(info.url, window.location.href);
+                const origin = this.sharePublicOrigin || window.location.origin;
                 // Take the origin wholesale rather than assigning protocol/host
                 // separately: the URL host setter leaves an existing port in place when
                 // the new value carries none, which would yield https://host:8000/...
                 info.url = new URL(
                     src.pathname + src.search + src.hash,
-                    window.location.origin
+                    origin
                 ).toString();
             } catch (e) {
                 // Keep the server's value rather than risk producing a broken link.
@@ -8490,7 +8499,8 @@ function noteApp() {
         /** Full URL for what is currently typed, built the way the server builds it. */
         shareSlugPreviewUrl() {
             if (!this.shareSlug) return '';
-            return `${window.location.origin}/share/${this.shareSlug}`;
+            const origin = this.sharePublicOrigin || window.location.origin;
+            return `${origin}/share/${this.shareSlug}`;
         },
 
         _shareSlugMessageFor(state) {
