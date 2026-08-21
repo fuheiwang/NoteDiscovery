@@ -30,6 +30,29 @@ name; those notes fall back to a suggestion based on the filename.
 > find, while `/share/recipes` is something anyone can try. Keep the random link for
 > anything you would not want a stranger to stumble onto.
 
+## Public Share Origin
+
+Share links normally use the host you are browsing on. If you open NoteDiscovery on
+your LAN (`http://192.168.x.x:8000`) but want copied / QR links to point at a public
+hostname, set an optional public origin:
+
+```yaml
+# config.yaml
+server:
+  share_public_origin: "https://notes.example.com"
+```
+
+Or via environment variable:
+
+```bash
+SHARE_PUBLIC_ORIGIN=https://notes.example.com
+```
+
+When set, the share dialog, QR code, clipboard copy, and the API `url` field use that
+origin. Leave it empty to keep the default. This only rewrites the **displayed /
+returned share URL** — it does not change how the app itself is routed. Your reverse
+proxy or tunnel must still make `/share/...` reachable on that host.
+
 ## Renaming a Link
 
 Edit the name in the Share modal and click **Update Link**. A note has one share link,
