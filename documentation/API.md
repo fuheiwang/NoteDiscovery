@@ -537,6 +537,7 @@ Unlike the HTML export above, this returns the **raw files** exactly as they are
 
 **Response:**
 - `200` — `application/zip`, named after the folder (or the app name for a whole-vault archive). Paths inside the archive are relative to the requested folder
+- `403` — the instance is running in demo mode, where archiving is disabled
 - `404` — folder does not exist, is not a directory, or contains no files
 - `413` — the files exceed `ARCHIVE_MAX_FOLDER_MB` (default 500). Archive a subfolder or raise the limit
 
@@ -546,6 +547,7 @@ Unlike the HTML export above, this returns the **raw files** exactly as they are
 - Symlinks are skipped, files and directories alike, so an archive can never contain anything from outside the vault
 - Already-compressed files (images, audio, video, PDFs) are stored rather than deflated, which is roughly six times faster for the same size
 - The response sets `Content-Encoding: identity` so the archive is not gzipped a second time in transit and keeps its `Content-Length`
+- Disabled entirely when `DEMO_MODE` is on: notes can be written on a demo, so an open archive route would let anyone upload attachments and then pull the whole vault repeatedly on the host's bandwidth
 
 **Rate Limit:** 10 requests/minute
 

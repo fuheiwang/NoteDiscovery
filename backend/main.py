@@ -1617,7 +1617,7 @@ def download_folder_archive(request: Request, folder: str = ""):
     parsed, which means media a note links to from a *different* folder is not
     pulled in — exporting a folder gives you that folder.
 
-    Symlinks, dot-files and dot-directories are skipped.
+    Symlinks, dot-files and dot-directories are skipped. Disabled in demo mode.
 
     Query Parameters:
         folder: Folder to archive, relative to the vault root. Omit it (or pass an
@@ -1626,6 +1626,14 @@ def download_folder_archive(request: Request, folder: str = ""):
     Returns:
         A zip file, with paths inside it relative to the requested folder.
     """
+    # Notes can be written in demo mode, so without this anyone could upload
+    # attachments and then ask for a zip of the whole vault ten times a minute, on
+    # the demo's bandwidth. Nothing about trying the app out needs its content
+    # downloaded. This also puts the rate limit above out of reach, since limits
+    # only apply in demo mode; it stays for the day this guard is lifted.
+    if DEMO_MODE:
+        raise HTTPException(status_code=403, detail="Archiving is disabled in demo mode")
+
     notes_dir = config['storage']['notes_dir']
     folder_path = (folder or '').strip().strip('/')
 
