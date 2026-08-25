@@ -2382,15 +2382,17 @@
                                 <!-- Logout (if auth enabled) - uses authEnabled from main app state -->
                                 <div x-show="authEnabled" class="mb-4">
                                     <label class="block text-xs font-medium mb-2" style="color: var(--text-secondary);" x-text="t('settings.account')"></label>
-                                    <a 
-                                        href="/logout" 
-                                        class="flex items-center justify-center gap-2 px-3 py-2 text-sm rounded transition-colors"
-                                        style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-primary);"
-                                        onmouseover="this.style.backgroundColor='var(--bg-hover)'"
-                                        onmouseout="this.style.backgroundColor='var(--bg-primary)'"
-                                        x-text="'🔒 ' + t('settings.logout')"
-                                    >
-                                    </a>
+                                    <form method="POST" action="/logout">
+                                        <button
+                                            type="submit"
+                                            class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded transition-colors cursor-pointer"
+                                            style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-primary);"
+                                            onmouseover="this.style.backgroundColor='var(--bg-hover)'"
+                                            onmouseout="this.style.backgroundColor='var(--bg-primary)'"
+                                            x-text="'🔒 ' + t('settings.logout')"
+                                        >
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                             

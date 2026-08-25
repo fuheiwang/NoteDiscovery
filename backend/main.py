@@ -718,8 +718,18 @@ async def login(request: Request, password: str = Form(...)):
 
 
 @app.get("/logout", include_in_schema=False)
+async def logout_get_not_allowed():
+    """Reject GET so the SPA catch-all cannot serve the app here, and so
+    <img src="/logout"> cannot clear the session (use POST instead)."""
+    return Response(status_code=405, headers={"Allow": "POST"})
+
+
+@app.post("/logout", include_in_schema=False)
 async def logout(request: Request):
-    """Log out the current user"""
+    """Log out the current user.
+
+    POST-only so a third-party page cannot force logout via a GET (e.g. <img src>).
+    """
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)
 
