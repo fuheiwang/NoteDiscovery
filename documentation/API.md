@@ -521,6 +521,45 @@ curl -O "http://localhost:8000/api/export/docs/API.md?theme=dracula"
 # http://localhost:8000/api/export/docs/API.md?theme=light&download=false
 ```
 
+### Archive Folder as ZIP
+```http
+GET /api/archive?folder={folder_path}
+```
+
+Downloads a folder and everything under it as a ZIP file. Omit `folder` to archive the whole vault.
+
+Unlike the HTML export above, this returns the **raw files** exactly as they are stored — notes, their `_attachments`, and anything else in the tree — so the archive can be unzipped into another vault or opened in any editor.
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `folder` | query (optional) | Folder relative to the vault root (e.g., `Projects/Q3`). Omitted or empty archives the entire vault |
+
+**Response:**
+- `200` — `application/zip`, named after the folder (or the app name for a whole-vault archive). Paths inside the archive are relative to the requested folder
+- `403` — the instance is running in demo mode, where archiving is disabled
+- `404` — folder does not exist, is not a directory, or contains no files
+- `413` — the files exceed `ARCHIVE_MAX_FOLDER_MB` (default 500). Archive a subfolder or raise the limit
+
+**Notes:**
+- Note content is not parsed, so media referenced from a *different* folder is not pulled in: archiving a folder gives you that folder
+- Anything whose name begins with a `.` is left out, at any depth — dot-directories are not descended into at all, and a `folder` containing a dot-component is refused. That covers tooling state (`.git`, `.obsidian`) and the app's own `.share-tokens.json`, so **the archive holds your notes and attachments, not app state or credentials**. Handing it to someone else cannot leak working share links
+- Symlinks are skipped, files and directories alike, so an archive can never contain anything from outside the vault
+- Already-compressed files (images, audio, video, PDFs) are stored rather than deflated, which is roughly six times faster for the same size
+- The response sets `Content-Encoding: identity` so the archive is not gzipped a second time in transit and keeps its `Content-Length`
+- Disabled entirely when `DEMO_MODE` is on: notes can be written on a demo, so an open archive route would let anyone upload attachments and then pull the whole vault repeatedly on the host's bandwidth
+
+**Rate Limit:** 10 requests/minute
+
+**Example:**
+```bash
+# One folder
+curl -OJ "http://localhost:8000/api/archive?folder=Projects/Q3"
+
+# The whole vault
+curl -OJ http://localhost:8000/api/archive
+```
+
 ---
 
 ## ⚙️ System
