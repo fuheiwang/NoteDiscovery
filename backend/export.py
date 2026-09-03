@@ -684,6 +684,11 @@ def generate_export_html(
             padding-left: 2em;
             margin: 1em 0;
         }}
+        /* Nested unordered lists: disc → circle → square (matches in-app preview) */
+        .markdown-preview ul {{ list-style-type: disc; }}
+        .markdown-preview ul ul {{ list-style-type: circle; }}
+        .markdown-preview ul ul ul {{ list-style-type: square; }}
+        .markdown-preview ol {{ list-style-type: decimal; }}
         
         .markdown-preview li {{
             margin: 0.25em 0;
