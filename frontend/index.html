@@ -2139,14 +2139,39 @@
                             <!-- Stats Bar - Only show when there are notes or folders -->
                             <template x-if="homepageNotes().length > 0 || homepageFolders().length > 0">
                                 <div class="mb-6 p-4 rounded-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border-primary);">
+                                    <div class="relative mb-4">
+                                        <input
+                                            type="text"
+                                            x-model="homepageNameQuery"
+                                            :placeholder="t('sidebar.search_placeholder')"
+                                            :aria-label="t('sidebar.search_placeholder')"
+                                            class="w-full px-3 py-2 pl-9 pr-8 text-sm rounded focus:outline-none focus:ring-1"
+                                            style="background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-primary);"
+                                        >
+                                        <svg class="absolute left-3 top-2.5 w-4 h-4" style="color: var(--text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                        <button
+                                            type="button"
+                                            x-show="homepageNameQuery.length > 0"
+                                            @click="homepageNameQuery = ''"
+                                            class="absolute right-2 top-2 w-5 h-5 flex items-center justify-center rounded-full"
+                                            style="color: var(--text-tertiary);"
+                                            :title="t('sidebar.clear_search')"
+                                        >
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
                                     <div class="flex flex-wrap items-center gap-4 text-sm" style="color: var(--text-secondary);">
                                         <span class="font-semibold" style="color: var(--text-primary);">
-                                            <span x-text="homepageNotes().length"></span> 
-                                            <span x-text="homepageNotes().length === 1 ? t('homepage.note_singular') : t('homepage.note_plural')"></span>
+                                            <span x-text="homepageVisibleNotes().length"></span> 
+                                            <span x-text="homepageVisibleNotes().length === 1 ? t('homepage.note_singular') : t('homepage.note_plural')"></span>
                                         </span>
-                                        <span x-show="homepageFolders().length > 0">
-                                            <span x-text="homepageFolders().length"></span> 
-                                            <span x-text="homepageFolders().length === 1 ? t('homepage.folder_singular') : t('homepage.folder_plural')"></span>
+                                        <span x-show="homepageVisibleFolders().length > 0">
+                                            <span x-text="homepageVisibleFolders().length"></span> 
+                                            <span x-text="homepageVisibleFolders().length === 1 ? t('homepage.folder_singular') : t('homepage.folder_plural')"></span>
                                         </span>
                                         <div class="ml-auto flex items-center gap-2">
                                             <div class="flex rounded-lg p-0.5" style="background-color: var(--bg-tertiary);" role="group">
@@ -2213,11 +2238,16 @@
                                 </div>
                             </template>
                             
+                            <!-- Name filter matched nothing in a folder that still has items -->
+                            <template x-if="(homepageNotes().length > 0 || homepageFolders().length > 0) && homepageVisibleNotes().length === 0 && homepageVisibleFolders().length === 0">
+                                <p class="text-sm text-center py-8" style="color: var(--text-tertiary);" x-text="t('sidebar.no_results')"></p>
+                            </template>
+
                             <!-- Folders and Notes Grid -->
-                            <template x-if="(homepageNotes().length > 0 || homepageFolders().length > 0) && homepageView !== 'list'">
+                            <template x-if="(homepageVisibleNotes().length > 0 || homepageVisibleFolders().length > 0) && homepageView !== 'list'">
                                 <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
                                     <!-- Folders First -->
-                                    <template x-for="folder in homepageFolders()" :key="folder.path">
+                                    <template x-for="folder in homepageVisibleFolders()" :key="folder.path">
                                         <div 
                                             @click="goToHomepageFolder(folder.path)"
                                             class="homepage-card p-2 sm:p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg"
@@ -2258,7 +2288,7 @@
                                     </template>
                                     
                                     <!-- Notes -->
-                                    <template x-for="note in homepageNotes().slice(0, HOMEPAGE_MAX_NOTES)" :key="note.path">
+                                    <template x-for="note in homepageVisibleNotes().slice(0, HOMEPAGE_MAX_NOTES)" :key="note.path">
                                         <div 
                                             @click="openItem(note.path, note.type)"
                                             class="homepage-card p-2 sm:p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg"
@@ -2294,9 +2324,9 @@
                             </template>
 
                             <!-- Folders and Notes List -->
-                            <template x-if="(homepageNotes().length > 0 || homepageFolders().length > 0) && homepageView === 'list'">
+                            <template x-if="(homepageVisibleNotes().length > 0 || homepageVisibleFolders().length > 0) && homepageView === 'list'">
                                 <div class="homepage-list">
-                                    <template x-for="folder in homepageFolders()" :key="folder.path">
+                                    <template x-for="folder in homepageVisibleFolders()" :key="folder.path">
                                         <div
                                             @click="goToHomepageFolder(folder.path)"
                                             class="homepage-list-row"
@@ -2319,7 +2349,7 @@
                                             </button>
                                         </div>
                                     </template>
-                                    <template x-for="note in homepageNotes().slice(0, HOMEPAGE_MAX_NOTES)" :key="note.path">
+                                    <template x-for="note in homepageVisibleNotes().slice(0, HOMEPAGE_MAX_NOTES)" :key="note.path">
                                         <div
                                             @click="openItem(note.path, note.type)"
                                             class="homepage-list-row"
@@ -2348,9 +2378,9 @@
                             </template>
                             
                             <!-- Show More Indicator -->
-                            <div x-show="homepageNotes().length > HOMEPAGE_MAX_NOTES" class="mt-6 text-center">
+                            <div x-show="homepageVisibleNotes().length > HOMEPAGE_MAX_NOTES" class="mt-6 text-center">
                                 <p class="text-sm" style="color: var(--text-secondary);">
-                                    Showing <span x-text="HOMEPAGE_MAX_NOTES"></span> of <span x-text="homepageNotes().length"></span> notes in this folder.
+                                    Showing <span x-text="HOMEPAGE_MAX_NOTES"></span> of <span x-text="homepageVisibleNotes().length"></span> notes in this folder.
                                 </p>
                             </div>
                         </div>

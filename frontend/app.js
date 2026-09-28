@@ -520,6 +520,9 @@ function noteApp() {
         HOMEPAGE_MAX_NOTES: 50,
         // Read before init() so the first paint matches the saved layout.
         homepageView: localStorage.getItem('homepageView') === 'list' ? 'list' : 'cards',
+        // Name filter for the current homepage folder. Separate from searchQuery,
+        // which is the sidebar's full-text search.
+        homepageNameQuery: '',
         
         // Computed-like helpers for homepage (cached for performance)
         homepageNotes() {
@@ -613,6 +616,36 @@ function noteApp() {
             if (mode === this.homepageView) return;
             this.homepageView = mode;
             localStorage.setItem('homepageView', mode);
+        },
+
+        homepageNameNeedle() {
+            return (this.homepageNameQuery || '').trim().toLowerCase();
+        },
+
+        // Filter the current folder's notes or folders by name. An empty query
+        // returns the cached source array so Alpine does not rebuild the grid.
+        // Notes and folders keep separate cache entries: they share a folder, but
+        // a hit for one must not satisfy the other.
+        _filterHomepageByName(items, kind) {
+            const needle = this.homepageNameNeedle();
+            if (!needle) return items;
+            const cacheKey = kind === 'notes' ? 'noteFilter' : 'folderFilter';
+            const cache = this._homepageCache;
+            const entry = cache[cacheKey];
+            if (entry && entry.needle === needle && entry.source === items) {
+                return entry.result;
+            }
+            const filtered = items.filter(item => (item.name || '').toLowerCase().includes(needle));
+            cache[cacheKey] = { needle, source: items, result: filtered };
+            return filtered;
+        },
+
+        homepageVisibleNotes() {
+            return this._filterHomepageByName(this.homepageNotes(), 'notes');
+        },
+
+        homepageVisibleFolders() {
+            return this._filterHomepageByName(this.homepageFolders(), 'folders');
         },
         
         // Helper: Format file size nicely
@@ -8799,6 +8832,7 @@ function noteApp() {
         goToHomepageFolder(folderPath) {
             this.showGraph = false; // Close graph when navigating
             this.selectedHomepageFolder = folderPath || '';
+            this.homepageNameQuery = '';
             
             // Clear editor state to show landing page
             this.currentNote = '';
@@ -8824,6 +8858,7 @@ function noteApp() {
         goHome() {
             this.showGraph = false; // Close graph when going home
             this.selectedHomepageFolder = '';
+            this.homepageNameQuery = '';
             this.currentNote = '';
             this.currentNoteName = '';
             this.noteContent = '';
