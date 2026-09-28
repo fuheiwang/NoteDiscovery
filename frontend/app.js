@@ -76,6 +76,8 @@ const LOCAL_SETTINGS = {
     editorWidth: { key: 'editorWidth', type: 'number', default: 50, min: 20, max: 80 },
     // String settings with validation
     viewMode: { key: 'viewMode', type: 'string', default: 'split', valid: ['edit', 'split', 'preview'] },
+    // Homepage layout. Cards stay the default so existing vaults look unchanged.
+    homepageView: { key: 'homepageView', type: 'string', default: 'cards', valid: ['cards', 'list'] },
     // JSON settings
     favorites: { key: 'noteFavorites', type: 'json', default: [] },
 };
@@ -516,6 +518,8 @@ function noteApp() {
         
         // Homepage constants
         HOMEPAGE_MAX_NOTES: 50,
+        // Read before init() so the first paint matches the saved layout.
+        homepageView: localStorage.getItem('homepageView') === 'list' ? 'list' : 'cards',
         
         // Computed-like helpers for homepage (cached for performance)
         homepageNotes() {
@@ -602,6 +606,13 @@ function noteApp() {
             this._homepageCache.folderPath = this.selectedHomepageFolder;
             
             return breadcrumb;
+        },
+
+        setHomepageView(mode) {
+            if (mode !== 'cards' && mode !== 'list') return;
+            if (mode === this.homepageView) return;
+            this.homepageView = mode;
+            localStorage.setItem('homepageView', mode);
         },
         
         // Helper: Format file size nicely
