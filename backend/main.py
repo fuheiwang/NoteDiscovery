@@ -79,7 +79,13 @@ from .share import (
     validate_slug,
     ShareSlugError,
 )
-from .export import generate_export_html, embed_images_as_base64, convert_wikilinks_to_html, strip_frontmatter
+from .export import (
+    generate_export_html,
+    embed_images_as_base64,
+    convert_wikilinks_to_html,
+    strip_frontmatter,
+    attachment_content_disposition,
+)
 from .mcp_http import build_mcp_router
 
 # Load configuration
@@ -1803,7 +1809,7 @@ async def export_note_to_html(request: Request, note_path: str, theme: Optional[
                 content=html_content,
                 media_type="text/html",
                 headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"'
+                    "Content-Disposition": attachment_content_disposition(filename)
                 }
             )
         else:
