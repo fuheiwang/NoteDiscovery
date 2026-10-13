@@ -73,6 +73,7 @@ from .share import (
     get_note_by_token,
     delete_token_for_note,
     update_token_path,
+    update_token_prefix,
     get_all_shared_paths,
     is_slug_available,
     validate_slug,
@@ -1173,6 +1174,9 @@ async def move_folder_endpoint(request: Request, data: dict):
         
         if not success:
             raise HTTPException(status_code=400, detail=error_msg or "Failed to move folder")
+
+        # Share tokens store a note path. A folder move changes every note under it.
+        update_token_prefix(config['storage']['notes_dir'], old_path, new_path)
         
         return {
             "success": True,
@@ -1201,6 +1205,9 @@ async def rename_folder_endpoint(request: Request, data: dict):
         
         if not success:
             raise HTTPException(status_code=400, detail=error_msg or "Failed to rename folder")
+
+        # rename_folder is move_folder; tokens still need the new prefix.
+        update_token_prefix(config['storage']['notes_dir'], old_path, new_path)
         
         return {
             "success": True,

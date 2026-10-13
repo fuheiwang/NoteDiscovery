@@ -5432,10 +5432,12 @@ function noteApp() {
                     body: JSON.stringify({ oldPath: folderPath, newPath: newPath })
                 });
                 if (!response.ok) throw new Error('Server returned error');
+                await this.loadSharedNotePaths();
                 return true;
             } catch (error) {
                 ErrorHandler.handle('rename folder', error);
                 await this.loadNotes({ silent: true });
+                await this.loadSharedNotePaths();
                 return false;
             }
         },
@@ -5919,7 +5921,9 @@ function noteApp() {
             }
             
             // Optimistic rename: rewrite local path now + favorites + current
-            // note pointer + URL. POST new content, then DELETE old.
+            // note pointer. The file itself moves through /api/notes/move so a
+            // share token follows it. POST-then-DELETE revoked the link, because
+            // delete means the note is gone.
             this._optimisticRenameNote(oldPath, newPath);
             this._rebuildTreeAfterMutation();
             
@@ -5929,18 +5933,39 @@ function noteApp() {
                 this.saveFavorites();
             }
             this.currentNote = newPath;
+
+            // A pending autosave targets currentNote, which is already the new
+            // path. Let it fire and it would create the destination before the
+            // move, and the move would refuse to overwrite that file.
+            this.flushHistory();
+            if (this.saveTimeout) {
+                clearTimeout(this.saveTimeout);
+                this.saveTimeout = null;
+            }
             
             try {
-                const response = await fetch(`/api/notes/${newPath}`, {
+                const response = await fetch('/api/notes/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ oldPath, newPath })
+                });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || 'Server returned error');
+                }
+                // The moved file has the last saved copy. Write the editor
+                // buffer too, so a rename before autosave does not drop keystrokes.
+                const saveResponse = await fetch(`/api/notes/${newPath}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: this.noteContent })
                 });
-                if (!response.ok) throw new Error('Server returned error');
-                await fetch(`/api/notes/${oldPath}`, { method: 'DELETE' });
+                if (!saveResponse.ok) throw new Error('Server returned error');
+                await this.loadSharedNotePaths();
             } catch (error) {
                 ErrorHandler.handle('rename note', error);
                 await this.loadNotes({ silent: true });
+                await this.loadSharedNotePaths();
             }
         },
         
