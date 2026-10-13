@@ -102,20 +102,32 @@ const ErrorHandler = {
 };
 
 /**
+ * Encode one vault-relative path for a URL.
+ * Each segment is encoded on its own so a `#` stays in the path. Left raw, the
+ * browser treats it as a fragment and the request hits a different note.
+ */
+function encodeVaultPath(path) {
+    if (!path) return '';
+    return String(path).split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
+/**
  * Centralized filename validation
  * Supports Unicode characters (international text) but blocks dangerous filesystem characters.
  * Does NOT silently modify filenames - validates and returns status.
  */
 const FilenameValidator = {
-    // Characters that are forbidden in filenames across Windows/macOS/Linux
+    // Characters that are forbidden in filenames across Windows/macOS/Linux,
+    // plus `#`. A hash is legal on disk, but in this app it starts a heading
+    // link (`[[Note#heading]]`) and, unencoded, it is a URL fragment.
     // Windows: \ / : * ? " < > |
     // macOS: / :
     // Linux: / \0
     // Common set to block (including control characters)
-    FORBIDDEN_CHARS: /[\\/:*?"<>|\x00-\x1f]/,
+    FORBIDDEN_CHARS: /[\\/:*?"<>|#\x00-\x1f]/,
     
     // For display purposes - human readable list
-    FORBIDDEN_CHARS_DISPLAY: '\\ / : * ? " < > |',
+    FORBIDDEN_CHARS_DISPLAY: '\\ / : * ? " < > | #',
     
     /**
      * Validate a filename (single segment, no path separators)
@@ -1897,8 +1909,7 @@ function noteApp() {
                 }
                 
                 // CRITICAL: Check if note already exists
-                const existingNote = this.notes.find(note => note.path === notePath);
-                if (existingNote) {
+                if (this.notePathTaken(notePath)) {
                     this.toast(this.t('notes.already_exists', { name: validation.sanitized }), { type: 'warning' });
                     return;
                 }
@@ -2449,6 +2460,20 @@ function noteApp() {
         
         _filenameFromPath(path) {
             return path.split('/').pop();
+        },
+
+        // Windows and macOS store these as one file. Rename already used this
+        // comparison; create and import must too, or `b` overwrites `B`.
+        notePathTaken(path) {
+            if (!path) return false;
+            const lower = path.toLowerCase();
+            return this.notes.some(n => n.path.toLowerCase() === lower);
+        },
+
+        folderPathTaken(path) {
+            if (!path) return false;
+            const lower = path.toLowerCase();
+            return this.allFolders.some(folder => folder.toLowerCase() === lower);
         },
         
         _inferTypeFromPath(path) {
@@ -3111,7 +3136,7 @@ function noteApp() {
             
             const joinPath = (folder, filename) => folder ? `${folder}/${filename}` : filename;
             let targetPath = joinPath(currentFolder, `${stem}.md`);
-            if (this.notes.some(n => n.path === targetPath)) {
+            if (this.notePathTaken(targetPath)) {
                 const ts = this._autoTitleTimestamp();
                 targetPath = joinPath(currentFolder, `${stem}-${ts}.md`);
             }
@@ -3123,7 +3148,7 @@ function noteApp() {
             this._rebuildTreeAfterMutation();
             
             try {
-                const response = await fetch(`/api/notes/${targetPath}`, {
+                const response = await fetch(`/api/notes/${encodeVaultPath(targetPath)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content })
@@ -4670,7 +4695,7 @@ function noteApp() {
                 // Close mobile sidebar when a note is selected
                 this.mobileSidebarOpen = false;
 
-                const response = await fetch(`/api/notes/${notePath}`);
+                const response = await fetch(`/api/notes/${encodeVaultPath(notePath)}`);
                 
                 // Check if note exists
                 if (!response.ok) {
@@ -5137,8 +5162,7 @@ function noteApp() {
         async createNote(folderPath = null, directPath = null) {
             if (directPath) {
                 const notePath = directPath.endsWith('.md') ? directPath : `${directPath}.md`;
-                const existingNote = this.notes.find(note => note.path === notePath);
-                if (existingNote) {
+                if (this.notePathTaken(notePath)) {
                     this.toast(this.t('notes.already_exists', { name: notePath }), { type: 'warning' });
                     return;
                 }
@@ -5234,8 +5258,7 @@ function noteApp() {
                 const notePath = targetFolder
                     ? `${targetFolder}/${validatedName}.md`
                     : (validatedName.endsWith('.md') ? validatedName : `${validatedName}.md`);
-                const existingNote = this.notes.find(note => note.path === notePath);
-                if (existingNote) {
+                if (this.notePathTaken(notePath)) {
                     this.toast(this.t('notes.already_exists', { name: notePath }), { type: 'warning' });
                     return;
                 }
@@ -5253,7 +5276,7 @@ function noteApp() {
             }
             const validatedName = validation.sanitized;
             const folderPath = targetFolder ? `${targetFolder}/${validatedName}` : validatedName;
-            const existingFolder = this.allFolders.find(folder => folder === folderPath);
+            const existingFolder = this.allFolders.find(folder => folder.toLowerCase() === folderPath.toLowerCase());
             if (existingFolder) {
                 this.toast(this.t('folders.already_exists', { name: validatedName }), { type: 'warning' });
                 return;
@@ -5271,7 +5294,7 @@ function noteApp() {
             this._rebuildTreeAfterMutation();
             
             try {
-                const response = await fetch(`/api/notes/${notePath}`, {
+                const response = await fetch(`/api/notes/${encodeVaultPath(notePath)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: '' })
@@ -5395,6 +5418,10 @@ function noteApp() {
             const pathParts = folderPath.split('/');
             pathParts[pathParts.length - 1] = validatedName;
             const newPath = pathParts.join('/');
+            if (newPath !== folderPath && this.folderPathTaken(newPath)) {
+                this.toast(this.t('folders.already_exists', { name: validatedName }), { type: 'warning' });
+                return;
+            }
             
             const ok = await this._finalizeRenameFolder(folderPath, newPath);
             if (ok) this.closeRenameFolderModal();
@@ -5843,7 +5870,7 @@ function noteApp() {
             this.isSaving = true;
             
             try {
-                const response = await fetch(`/api/notes/${this.currentNote}`, {
+                const response = await fetch(`/api/notes/${encodeVaultPath(this.currentNote)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: this.noteContent })
@@ -5912,7 +5939,7 @@ function noteApp() {
             if (oldPath === newPath) return;
             
             // Check if a note with the new name already exists
-            const existingNote = this.notes.find(n => n.path.toLowerCase() === newPath.toLowerCase());
+            const existingNote = this.notePathTaken(newPath) ? { path: newPath } : null;
             if (existingNote) {
                 this.toast(this.t('notes.already_exists', { name: validatedName }), { type: 'warning' });
                 // Reset the name in the UI
@@ -5955,7 +5982,7 @@ function noteApp() {
                 }
                 // The moved file has the last saved copy. Write the editor
                 // buffer too, so a rename before autosave does not drop keystrokes.
-                const saveResponse = await fetch(`/api/notes/${newPath}`, {
+                const saveResponse = await fetch(`/api/notes/${encodeVaultPath(newPath)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: this.noteContent })
@@ -6008,7 +6035,7 @@ function noteApp() {
             }
             
             try {
-                const response = await fetch(`/api/notes/${notePath}`, { method: 'DELETE' });
+                const response = await fetch(`/api/notes/${encodeVaultPath(notePath)}`, { method: 'DELETE' });
                 if (!response.ok) throw new Error('Server returned error');
                 this.loadTagsDebounced();
             } catch (error) {

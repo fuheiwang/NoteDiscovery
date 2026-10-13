@@ -45,6 +45,11 @@ from .utils import (
     create_note_metadata,
     ensure_directories,
     create_folder,
+    note_name_conflict,
+    note_exists_exact,
+    folder_name_conflict,
+    folder_exists_exact,
+    path_has_hash,
     move_note,
     move_folder,
     rename_folder,
@@ -868,8 +873,15 @@ async def create_new_folder(request: Request, data: dict):
         folder_path = data.get('path', '')
         if not folder_path:
             raise HTTPException(status_code=400, detail="Folder path required")
+
+        notes_dir = config['storage']['notes_dir']
+        conflict = folder_name_conflict(notes_dir, folder_path)
+        if conflict:
+            raise HTTPException(status_code=409, detail=f"A folder already exists at: {conflict}")
+        if path_has_hash(folder_path) and not folder_exists_exact(notes_dir, folder_path):
+            raise HTTPException(status_code=400, detail="Folder name cannot contain '#'")
         
-        success = create_folder(config['storage']['notes_dir'], folder_path)
+        success = create_folder(notes_dir, folder_path)
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to create folder")
@@ -1361,6 +1373,23 @@ async def get_template(request: Request, template_name: str):
         raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to get template"))
 
 
+def _refuse_note_name_clash(note_path: str, *, creating: bool = False) -> None:
+    """Block a write that would erase another note, or introduce a `#` name.
+
+    Autosave updates an existing note and must keep working, including a note
+    whose name already contains `#`. `creating` is for endpoints that only
+    create: an exact existing path is a clash there too.
+    """
+    notes_dir = config['storage']['notes_dir']
+    conflict = note_name_conflict(notes_dir, note_path)
+    if conflict:
+        raise HTTPException(status_code=409, detail=f"A note already exists at: {conflict}")
+    if creating and note_exists_exact(notes_dir, note_path):
+        raise HTTPException(status_code=409, detail=f"A note already exists at: {note_path}")
+    if path_has_hash(note_path) and not note_exists_exact(notes_dir, note_path):
+        raise HTTPException(status_code=400, detail="Note name cannot contain '#'")
+
+
 @api_router.post("/templates/create-note", tags=["Templates"])
 @limiter.limit("60/minute")
 async def create_note_from_template(request: Request, data: dict):
@@ -1379,6 +1408,8 @@ async def create_note_from_template(request: Request, data: dict):
         
         if not template_name or not note_path:
             raise HTTPException(status_code=400, detail="Template name and note path required")
+
+        _refuse_note_name_clash(note_path, creating=True)
         
         # Get template content
         template_content = get_template_content(config['storage']['notes_dir'], template_name)
@@ -1501,6 +1532,10 @@ async def create_or_update_note(request: Request, note_path: str, content: dict)
     """Create or update a note"""
     try:
         note_content = content.get('content', '')
+
+        # A different case is a different request for the same file on Windows
+        # and macOS. Refuse before save_note opens it and erases the other name.
+        _refuse_note_name_clash(note_path)
         
         # Check if this is a new note (doesn't exist yet)
         existing_content = get_note_content(config['storage']['notes_dir'], note_path)
