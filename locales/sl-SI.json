@@ -98,7 +98,12 @@
     "not_found": "Zapisa ni mogoče najti: {{path}}",
     "create_from_link": "Zapis \"{{path}}\" ne obstaja.\n\nAli ga želite ustvariti?",
     "no_content": "Ni vsebine za izvoz",
-    "open_first": "Prosimo, najprej odprite zapis, preden naložite slike."
+    "open_first": "Prosimo, najprej odprite zapis, preden naložite slike.",
+    "save_conflict_title": "Zapis spremenjen drugje",
+    "save_conflict_message": "Zapis \"{{name}}\" se je na disku spremenil, odkar ste ga odprli: vanj je pisal drug zavihek, orodje za sinhronizacijo ali agent UI.\n\nZnova naloži prikaže različico z diska; neshranjene spremembe bodo zavržene.\nPrepiši shrani vašo različico namesto njihove.",
+    "save_conflict_overwrite": "Prepiši",
+    "save_conflict_reload": "Znova naloži",
+    "save_conflict_unsaved": "\"{{name}}\": vaše zadnje spremembe niso bile shranjene, zapis se je spremenil drugje."
   },
   "folders": {
     "confirm_delete": "⚠️ OPOZORILO ⚠️\n\nAli ste prepričani, da želite izbrisati mapo \"{{name}}\"?\n\nTo bo TRAJNO izbrisalo:\n• Vse zapiske v tej mapi\n• Vse podmape in njihovo vsebino\n\nTe akcije NI mogoče preklicati!",

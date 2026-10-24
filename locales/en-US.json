@@ -98,7 +98,12 @@
     "not_found": "Note not found: {{path}}",
     "create_from_link": "Note \"{{path}}\" doesn't exist.\n\nWould you like to create it?",
     "no_content": "No note content to export",
-    "open_first": "Please open a note first before uploading images."
+    "open_first": "Please open a note first before uploading images.",
+    "save_conflict_title": "Note changed elsewhere",
+    "save_conflict_message": "\"{{name}}\" changed on disk since you opened it: another tab, a sync tool or an AI agent wrote to it.\n\nReload shows the version on disk; your unsaved changes are discarded.\nOverwrite saves your version in place of theirs.",
+    "save_conflict_overwrite": "Overwrite",
+    "save_conflict_reload": "Reload",
+    "save_conflict_unsaved": "\"{{name}}\": your last changes were not saved, the note changed elsewhere."
   },
   "folders": {
     "confirm_delete": "⚠️ WARNING ⚠️\n\nAre you sure you want to delete the folder \"{{name}}\"?\n\nThis will PERMANENTLY delete:\n• All notes inside this folder\n• All subfolders and their contents\n\nThis action CANNOT be undone!",

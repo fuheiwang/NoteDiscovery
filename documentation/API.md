@@ -53,6 +53,7 @@ curl http://localhost:8000/api/notes/folder/mynote.md
 {
   "path": "folder/mynote.md",
   "content": "# My Note\n\nNote content here...",
+  "hash": "9f2c…e41a",
   "metadata": {
     "created": "2026-03-15T10:00:00+01:00",
     "modified": "2026-03-17T14:30:00+01:00",
@@ -86,6 +87,8 @@ curl http://localhost:8000/api/notes/folder/mynote.md
 | `references[].context` | Text snippet around the link |
 | `references[].type` | Link type: `wikilink` or `markdown` |
 
+`hash` is the SHA-256 of the note as stored on disk (before any `on_note_load` plugin transforms it). Send it back as `base_hash` when saving to detect changes made in the meantime.
+
 **Without Backlinks:**
 ```bash
 curl "http://localhost:8000/api/notes/folder/mynote.md?include_backlinks=false"
@@ -97,9 +100,15 @@ POST /api/notes/{note_path}
 Content-Type: application/json
 
 {
-  "content": "# My Note\nNote content here..."
+  "content": "# My Note\nNote content here...",
+  "base_hash": "9f2c…e41a"
 }
 ```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `content` | yes | Full note content |
+| `base_hash` | no | `hash` of the version this content was based on. If the file on disk no longer matches it, the note is not saved and `409` is returned. Omit it to always overwrite (previous behavior). |
 
 **Response:**
 ```json
@@ -107,11 +116,20 @@ Content-Type: application/json
   "success": true,
   "path": "test.md",
   "message": "Note created successfully",
-  "content": "# My Note\nNote content here..."
+  "content": "# My Note\nNote content here...",
+  "hash": "51b0…7c3d"
 }
 ```
 
 **Note:** When creating a new note, the `on_note_create` hook is triggered, allowing plugins to modify the initial content. The response includes the potentially modified content.
+
+**Conflict (409):** the note changed on disk since `base_hash` was read (another tab, a sync tool, an AI agent). Nothing is written. The response carries the current hash: `GET` the note to reload it, or send the same content again with that hash to overwrite.
+```json
+{
+  "detail": "Note changed on disk since it was loaded",
+  "hash": "c07d…92b8"
+}
+```
 
 **Linux/Mac:**
 ```bash

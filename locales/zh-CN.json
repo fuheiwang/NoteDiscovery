@@ -98,7 +98,12 @@
     "not_found": "未找到笔记：{{path}}",
     "create_from_link": "笔记 \"{{path}}\" 不存在。\n\n是否要创建它？",
     "no_content": "没有可导出的笔记内容",
-    "open_first": "请先打开一篇笔记，然后再上传图片。"
+    "open_first": "请先打开一篇笔记，然后再上传图片。",
+    "save_conflict_title": "笔记已在别处修改",
+    "save_conflict_message": "笔记 \"{{name}}\" 在你打开后已在磁盘上被修改：另一个标签页、同步工具或 AI 代理写入了它。\n\n“重新加载”显示磁盘上的版本；未保存的更改将被丢弃。\n“覆盖”用你的版本替换它。",
+    "save_conflict_overwrite": "覆盖",
+    "save_conflict_reload": "重新加载",
+    "save_conflict_unsaved": "\"{{name}}\"：你最后的更改未保存，笔记已在别处修改。"
   },
   "folders": {
     "confirm_delete": "⚠️ 警告 ⚠️\n\n您确定要删除文件夹 \"{{name}}\" 吗？\n\n这将永久删除：\n• 此文件夹内的所有笔记\n• 所有子文件夹及其内容\n\n此操作无法撤销！",

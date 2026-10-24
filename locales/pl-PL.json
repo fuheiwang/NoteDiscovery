@@ -98,7 +98,12 @@
     "not_found": "Nie znaleziono notatki: {{path}}",
     "create_from_link": "Notatka „{{path}}” nie istnieje.\n\nCzy chcesz ją utworzyć?",
     "no_content": "Brak treści notatki do wyeksportowania",
-    "open_first": "Najpierw otwórz notatkę, aby przesłać obrazy."
+    "open_first": "Najpierw otwórz notatkę, aby przesłać obrazy.",
+    "save_conflict_title": "Notatka zmieniona gdzie indziej",
+    "save_conflict_message": "Notatka „{{name}}” zmieniła się na dysku od czasu jej otwarcia: zapisała do niej inna karta, narzędzie do synchronizacji lub agent AI.\n\nPrzeładuj pokazuje wersję z dysku; niezapisane zmiany zostaną odrzucone.\nNadpisz zapisuje Twoją wersję w miejsce tamtej.",
+    "save_conflict_overwrite": "Nadpisz",
+    "save_conflict_reload": "Przeładuj",
+    "save_conflict_unsaved": "„{{name}}”: ostatnie zmiany nie zostały zapisane, notatka zmieniła się gdzie indziej."
   },
   "folders": {
     "confirm_delete": "⚠️ OSTRZEŻENIE ⚠️\n\nCzy na pewno chcesz usunąć folder „{{name}}”?\n\nTo TRWALE usunie:\n• Wszystkie notatki w tym folderze\n• Wszystkie podfoldery i ich zawartość\n\nTej operacji NIE MOŻNA cofnąć!",
