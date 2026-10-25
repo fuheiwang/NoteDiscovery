@@ -68,6 +68,7 @@ For file naming, API notes, and more: **[DRAWING.md](DRAWING.md)**
 
 ### Internal Links
 - **Wikilinks** - `[[Note Name]]` Obsidian-style syntax for quick linking
+- **Wikilink autocomplete** - Typing `[[` suggests notes and `![[` suggests media from the vault. Arrow keys move through the list, Enter or Tab inserts the link, Esc dismisses it
 - **Wikilinks with display text** - `[[Note Name|Click here]]` to customize link text
 - **Section anchors** - `[[Note Name#heading]]` to link directly to a heading
 - **Same-page anchors** - `[[#heading]]` to link within the current note
