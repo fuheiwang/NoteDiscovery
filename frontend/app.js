@@ -332,6 +332,9 @@ function noteApp() {
         totalMatches: 0, // Total number of matches in the note
         isSaving: false,
         lastSaved: false,
+        noteBaseHash: null,        // Fingerprint of the current note as last read or written on disk
+        _saveQueued: false,        // A save was requested while another was in flight
+        _saveConflictOpen: false,  // The "changed elsewhere" prompt is showing; saves wait
         linkCopied: false,
         zenMode: false,
         // Hides only the .sidebar-panel content (files / search / tags / outline / etc.) while
@@ -4704,6 +4707,7 @@ function noteApp() {
                         window.history.replaceState({ homepageFolder: this.selectedHomepageFolder || '' }, '', '/');
                         this.currentNote = '';
                         this.noteContent = '';
+                        this.noteBaseHash = null;
                         this.closeMediaViewer();
                         document.title = this.appName;
                         return;
@@ -4719,6 +4723,7 @@ function noteApp() {
                 this._cachedRenderedHTML = '';
                 this._initializedVideoSources = new Set(); // Clear video cache for new note
                 this.noteContent = data.content;
+                this.noteBaseHash = data.hash || null;
                 // Note: scroll restoration happens later in the post-$nextTick block below
                 // (where the existing scrollToTop call used to live), via _restoreNoteScroll().
                 // Doing it there means a single, unified restore path instead of two racing
@@ -5866,17 +5871,58 @@ function noteApp() {
         // Save current note
         async saveNote() {
             if (!this.currentNote) return;
-            
+            // The "changed elsewhere" prompt is open: nothing is written until the user chooses.
+            if (this._saveConflictOpen) return;
+            // One save at a time. A second request sent before the first returns would
+            // carry a stale base_hash and trip the conflict check against our own write.
+            if (this.isSaving) {
+                this._saveQueued = true;
+                return;
+            }
+
             this.isSaving = true;
-            
+            const notePath = this.currentNote;
+
             try {
-                const response = await fetch(`/api/notes/${encodeVaultPath(this.currentNote)}`, {
+                const response = await fetch(`/api/notes/${encodeVaultPath(notePath)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: this.noteContent })
+                    // base_hash lets the server refuse (409) a write over a file that
+                    // changed on disk since we read it.
+                    body: JSON.stringify({ content: this.noteContent, base_hash: this.noteBaseHash })
                 });
-                
+
+                if (response.status === 409) {
+                    const detail = await response.json();
+                    if (notePath !== this.currentNote) {
+                        // The user already moved to another note: its base hash is not ours to touch.
+                        const name = notePath.split('/').pop().replace('.md', '');
+                        this.toast(this.t('notes.save_conflict_unsaved', { name }), { type: 'warning' });
+                        return;
+                    }
+                    // Nothing is in flight while the user decides.
+                    this.isSaving = false;
+                    if (await this._askSaveConflict(notePath)) {
+                        // Overwrite: take the disk version as the base, re-send ours.
+                        this.noteBaseHash = detail.hash || null;
+                        this._saveQueued = true;
+                    } else {
+                        // Reload: drop the pending autosave and show the version on disk.
+                        if (this.saveTimeout) {
+                            clearTimeout(this.saveTimeout);
+                            this.saveTimeout = null;
+                        }
+                        this._saveQueued = false;
+                        await this.loadNote(notePath, false);
+                    }
+                    return;
+                }
+
                 if (response.ok) {
+                    const result = await response.json();
+                    if (notePath === this.currentNote) {
+                        this.noteBaseHash = result.hash || null;
+                    }
                     this.lastSaved = true;
                     
                     // Update only the modified timestamp for the current note (no full reload needed)
@@ -5908,9 +5954,31 @@ function noteApp() {
                 ErrorHandler.handle('save note', error);
             } finally {
                 this.isSaving = false;
+                if (this._saveQueued) {
+                    this._saveQueued = false;
+                    this.saveNote();
+                }
             }
         },
-        
+
+        // Ask what to do when the server refused a save because the file changed on disk.
+        // Resolves true to overwrite. Escape, a click outside or "Reload" keep the disk version.
+        async _askSaveConflict(notePath) {
+            this._saveConflictOpen = true;
+            try {
+                const name = notePath.split('/').pop().replace('.md', '');
+                return await this.confirmModalAsk({
+                    title: this.t('notes.save_conflict_title'),
+                    message: this.t('notes.save_conflict_message', { name }),
+                    danger: true,
+                    confirmLabel: this.t('notes.save_conflict_overwrite'),
+                    cancelLabel: this.t('notes.save_conflict_reload')
+                });
+            } finally {
+                this._saveConflictOpen = false;
+            }
+        },
+
         // Rename current note
         async renameNote() {
             if (!this.currentNote) return;
@@ -5985,9 +6053,18 @@ function noteApp() {
                 const saveResponse = await fetch(`/api/notes/${encodeVaultPath(newPath)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: this.noteContent })
+                    body: JSON.stringify({ content: this.noteContent, base_hash: this.noteBaseHash })
                 });
-                if (!saveResponse.ok) throw new Error('Server returned error');
+                if (saveResponse.status === 409) {
+                    // Changed elsewhere before the rename: the regular save asks what to do.
+                    this.saveNote();
+                } else if (!saveResponse.ok) {
+                    throw new Error('Server returned error');
+                } else if (newPath === this.currentNote) {
+                    // Our own write: it is the base for the next save.
+                    const saved = await saveResponse.json();
+                    this.noteBaseHash = saved.hash || null;
+                }
                 await this.loadSharedNotePaths();
             } catch (error) {
                 ErrorHandler.handle('rename note', error);

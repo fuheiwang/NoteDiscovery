@@ -98,7 +98,12 @@
     "not_found": "Note introuvable : {{path}}",
     "create_from_link": "La note \"{{path}}\" n'existe pas.\n\nVoulez-vous la créer ?",
     "no_content": "Aucun contenu à exporter",
-    "open_first": "Veuillez d'abord ouvrir une note avant de télécharger des images."
+    "open_first": "Veuillez d'abord ouvrir une note avant de télécharger des images.",
+    "save_conflict_title": "Note modifiée ailleurs",
+    "save_conflict_message": "La note \"{{name}}\" a changé sur le disque depuis son ouverture : un autre onglet, un outil de synchronisation ou un agent IA y a écrit.\n\nRecharger affiche la version du disque ; vos modifications non enregistrées sont abandonnées.\nÉcraser enregistre votre version à la place de la leur.",
+    "save_conflict_overwrite": "Écraser",
+    "save_conflict_reload": "Recharger",
+    "save_conflict_unsaved": "\"{{name}}\" : vos dernières modifications n'ont pas été enregistrées, la note a changé ailleurs."
   },
   "folders": {
     "confirm_delete": "⚠️ ATTENTION ⚠️\n\nÊtes-vous sûr de vouloir supprimer le dossier \"{{name}}\" ?\n\nCeci supprimera DÉFINITIVEMENT :\n• Toutes les notes dans ce dossier\n• Tous les sous-dossiers et leur contenu\n\nCette action est IRRÉVERSIBLE !",

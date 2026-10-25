@@ -1496,6 +1496,16 @@ async def list_notes(
         raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to list notes"))
 
 
+def _content_hash(content: str) -> str:
+    """Fingerprint of a note as stored on disk, for the save conflict check.
+
+    Line endings are normalized the way a text-mode read sees them, so the hash of
+    what a save writes matches the hash of the same file read back later.
+    """
+    normalized = content.replace('\r\n', '\n').replace('\r', '\n')
+    return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+
+
 @api_router.get("/notes/{note_path:path}", tags=["Notes"])
 async def get_note(note_path: str, include_backlinks: bool = True):
     """Get a specific note's content with optional backlinks"""
@@ -1504,12 +1514,17 @@ async def get_note(note_path: str, include_backlinks: bool = True):
         if content is None:
             raise HTTPException(status_code=404, detail="Note not found")
 
+        # Fingerprint the stored text, before any plugin transforms it: this is
+        # what a later save compares against to detect a write from elsewhere.
+        stored_hash = _content_hash(content)
+
         # Run on_note_load hook (can transform content, e.g., decrypt)
         content = plugin_manager.dispatch('on_note_load', note_path=note_path, content=content)
 
         response = {
             "path": note_path,
             "content": content,
+            "hash": stored_hash,
             "metadata": create_note_metadata(config['storage']['notes_dir'], note_path)
         }
         
@@ -1540,7 +1555,20 @@ async def create_or_update_note(request: Request, note_path: str, content: dict)
         # Check if this is a new note (doesn't exist yet)
         existing_content = get_note_content(config['storage']['notes_dir'], note_path)
         is_new_note = existing_content is None
-        
+
+        # Optional optimistic concurrency check. A client that sends base_hash (the
+        # fingerprint it loaded or last saved) gets a 409 instead of overwriting a
+        # file that something else rewrote in the meantime (another tab, an agent,
+        # a sync tool). Clients that omit it keep the previous last-write-wins.
+        base_hash = content.get('base_hash')
+        if base_hash and not is_new_note:
+            current_hash = _content_hash(existing_content)
+            if current_hash != base_hash:
+                return JSONResponse(status_code=409, content={
+                    "detail": "Note changed on disk since it was loaded",
+                    "hash": current_hash
+                })
+
         # If creating a new note, run on_note_create hook to allow plugins to modify initial content
         if is_new_note:
             note_content = plugin_manager.dispatch(
@@ -1561,7 +1589,8 @@ async def create_or_update_note(request: Request, note_path: str, content: dict)
             "success": True,
             "path": note_path,
             "message": "Note created successfully" if is_new_note else "Note saved successfully",
-            "content": note_content  # Return the (potentially modified) content
+            "content": note_content,  # Return the (potentially modified) content
+            "hash": _content_hash(transformed_content)  # Base for the next save
         }
     except HTTPException:
         raise

@@ -6,6 +6,7 @@
 - **Rich markdown editor** with live preview
 - **Three view modes**: Edit, Split, Preview
 - **Auto-save** - Never lose your work
+- **Save conflict check** - If the file changed on disk since you opened it (another tab, a sync tool, an AI agent), saving asks whether to reload it or overwrite it instead of silently replacing the other change
 - **Resume where you left off** - Editor scroll position is remembered per note within the session, so switching back to a long note returns you to the same spot
 - **Undo/Redo** - Ctrl+Z / Ctrl+Y support
 - **Note templates** - Create notes from templates with dynamic placeholders

@@ -98,7 +98,12 @@
     "not_found": "Nota no encontrada: {{path}}",
     "create_from_link": "La nota \"{{path}}\" no existe.\n\n¿Desea crearla?",
     "no_content": "No hay contenido para exportar",
-    "open_first": "Por favor, abre una nota antes de subir imágenes."
+    "open_first": "Por favor, abre una nota antes de subir imágenes.",
+    "save_conflict_title": "Nota modificada en otro lugar",
+    "save_conflict_message": "\"{{name}}\" ha cambiado en el disco desde que la abriste: otra pestaña, una herramienta de sincronización o un agente de IA ha escrito en ella.\n\nRecargar muestra la versión del disco; tus cambios sin guardar se descartan.\nSobrescribir guarda tu versión en lugar de la suya.",
+    "save_conflict_overwrite": "Sobrescribir",
+    "save_conflict_reload": "Recargar",
+    "save_conflict_unsaved": "\"{{name}}\": tus últimos cambios no se guardaron, la nota cambió en otro lugar."
   },
   "folders": {
     "confirm_delete": "⚠️ ADVERTENCIA ⚠️\n\n¿Estás seguro de que quieres eliminar la carpeta \"{{name}}\"?\n\nEsto eliminará PERMANENTEMENTE:\n• Todas las notas dentro de esta carpeta\n• Todas las subcarpetas y su contenido\n\n¡Esta acción NO se puede deshacer!",
