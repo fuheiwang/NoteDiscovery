@@ -203,6 +203,44 @@ Had a productive meeting about the roadmap.
 curl.exe -X PATCH http://localhost:8000/api/notes/daily-journal.md -H "Content-Type: application/json" -d "{\"content\": \"New entry here\", \"add_timestamp\": true}"
 ```
 
+### Replace Text in Note
+```http
+POST /api/notes/replace
+Content-Type: application/json
+
+{
+  "path": "projects/alpha.md",
+  "old_str": "Deadline: March",
+  "new_str": "Deadline: April"
+}
+```
+
+Replace one exact occurrence of a text in an existing note, without sending the whole note. `old_str` is matched against the content `GET /api/notes/{note_path}` returns. Nothing is written unless it appears exactly once.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `path` | string | Yes | Path to the existing note |
+| `old_str` | string | Yes | Exact text to replace. Must appear exactly once |
+| `new_str` | string | Yes | Replacement text. An empty string deletes `old_str` |
+
+**Errors:**
+| Status | When |
+|--------|------|
+| `400` | `path` or `old_str` is empty, or `new_str` is missing |
+| `404` | The note does not exist |
+| `409` | `old_str` is not found, or is found more than once |
+
+**Response:**
+```json
+{
+  "success": true,
+  "path": "projects/alpha.md",
+  "message": "Note updated successfully",
+  "hash": "<sha256 of the saved content>"
+}
+```
+
 ### Move Note
 ```http
 POST /api/notes/move

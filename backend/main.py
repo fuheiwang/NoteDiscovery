@@ -1177,6 +1177,72 @@ async def move_note_endpoint(request: Request, data: dict):
         raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to move note"))
 
 
+# Declared before POST /notes/{note_path:path}, which would otherwise take this
+# request as a save of a note called "replace".
+@api_router.post("/notes/replace", tags=["Notes"])
+@limiter.limit("60/minute")
+async def replace_in_note(request: Request, data: dict):
+    """
+    Replace one exact occurrence of a text in an existing note.
+
+    Lets a client change part of a note without sending the whole file back.
+    Nothing is written unless old_str appears exactly once, so an edit based on
+    a stale copy of the note fails instead of overwriting it.
+
+    Args:
+        data: Dictionary with 'path', 'old_str' and 'new_str' (may be empty to delete)
+    """
+    try:
+        note_path = data.get('path', '')
+        old_str = data.get('old_str', '')
+        new_str = data.get('new_str', '')
+
+        if not note_path:
+            raise HTTPException(status_code=400, detail="path is required")
+        if not isinstance(old_str, str) or not old_str:
+            raise HTTPException(status_code=400, detail="old_str is required")
+        if 'new_str' not in data or not isinstance(new_str, str):
+            raise HTTPException(status_code=400, detail="new_str is required (use an empty string to delete)")
+
+        existing_content = get_note_content(config['storage']['notes_dir'], note_path)
+        if existing_content is None:
+            raise HTTPException(status_code=404, detail="Note not found")
+
+        # Match against the same text GET /notes/{path} returns, so a client can
+        # copy old_str straight from what it read.
+        content = plugin_manager.dispatch('on_note_load', note_path=note_path, content=existing_content)
+
+        occurrences = content.count(old_str)
+        if occurrences == 0:
+            raise HTTPException(status_code=409, detail="old_str not found in note")
+        if occurrences > 1:
+            raise HTTPException(
+                status_code=409,
+                detail=f"old_str found {occurrences} times; include more surrounding text to make it unique"
+            )
+
+        new_content = content.replace(old_str, new_str, 1)
+
+        # Same save path as a regular save
+        transformed_content = plugin_manager.dispatch('on_note_save', note_path=note_path, content=new_content)
+
+        success = save_note(config['storage']['notes_dir'], note_path, transformed_content)
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to save note")
+
+        return {
+            "success": True,
+            "path": note_path,
+            "message": "Note updated successfully",
+            "hash": _content_hash(transformed_content)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=safe_error_message(e, "Failed to update note"))
+
+
 @api_router.post("/folders/move", tags=["Folders"])
 @limiter.limit("20/minute")
 async def move_folder_endpoint(request: Request, data: dict):
