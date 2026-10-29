@@ -57,24 +57,26 @@
         })();
     </script>
     
-    <!-- Preload the saved theme before Alpine renders, so a reload doesn't flash
-         the default theme. Mirrors the synchronous locale preload above; app.js
-         reuses this #dynamic-theme element later in applyTheme(). -->
+    <!-- Preload the theme before Alpine renders, so a reload doesn't flash.
+         A saved preference wins; otherwise the configured default (__DEFAULT_THEME__).
+         data-theme is set only after the CSS is parsed and inserted. app.js reuses
+         #dynamic-theme and skips a second download when the id still matches. -->
     <script>
         (function() {
             try {
-                const themeId = localStorage.getItem('noteDiscoveryTheme');
-                if (!themeId) return; // No saved preference: default theme applies as before
-                document.documentElement.setAttribute('data-theme', themeId);
+                const themeId = localStorage.getItem('noteDiscoveryTheme') || '__DEFAULT_THEME__';
+                if (!themeId) return;
                 const xhr = new XMLHttpRequest();
-                xhr.open('GET', '/api/themes/' + encodeURIComponent(themeId), false); // Synchronous
+                xhr.open('GET', '/api/themes/' + encodeURIComponent(themeId), false);
                 xhr.send();
-                if (xhr.status === 200) {
-                    const styleEl = document.createElement('style');
-                    styleEl.id = 'dynamic-theme';
-                    styleEl.textContent = JSON.parse(xhr.responseText).css;
-                    document.head.appendChild(styleEl);
-                }
+                if (xhr.status !== 200) return;
+                const css = JSON.parse(xhr.responseText).css;
+                if (typeof css !== 'string' || !css) return;
+                const styleEl = document.createElement('style');
+                styleEl.id = 'dynamic-theme';
+                styleEl.textContent = css;
+                document.head.appendChild(styleEl);
+                document.documentElement.setAttribute('data-theme', themeId);
             } catch (e) {
                 // Fall back to the normal async applyTheme() path in app.js
                 console.error('Failed to preload theme:', e);

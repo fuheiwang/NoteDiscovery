@@ -2315,11 +2315,14 @@ async def catch_all(full_path: str, request: Request):
     if full_path.startswith('api/') or full_path.startswith('static/'):
         raise HTTPException(status_code=404, detail="Not found")
     
-    # Serve index.html with app name injected
+    # Serve index.html with app name and the configured default theme injected.
+    # The head script uses __DEFAULT_THEME__ when the browser has no saved preference.
     index_path = static_path / "index.html"
     async with aiofiles.open(index_path, 'r', encoding='utf-8') as f:
         content = await f.read()
-    return _html_page_response(_render_app_name_html(content), request)
+    content = _render_app_name_html(content)
+    content = content.replace('__DEFAULT_THEME__', DEFAULT_THEME)
+    return _html_page_response(content, request)
 
 
 # ============================================================================

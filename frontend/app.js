@@ -1482,22 +1482,30 @@ function noteApp() {
         
         // Apply theme to document
         async applyTheme(themeId) {
-            // Load theme CSS from file
+            // Load theme CSS from file. The head preload may already have inserted
+            // #dynamic-theme for this id; skip the second download and the CSS write
+            // in that case. Highlight.js is still updated below, because the preload
+            // does not touch #highlight-theme.
             try {
-                const response = await fetch(`/api/themes/${themeId}`);
-                const data = await response.json();
-                
-                // Create or update style element
-                let styleEl = document.getElementById('dynamic-theme');
-                if (!styleEl) {
-                    styleEl = document.createElement('style');
-                    styleEl.id = 'dynamic-theme';
-                    document.head.appendChild(styleEl);
+                const existing = document.getElementById('dynamic-theme');
+                const alreadyLoaded = existing
+                    && existing.textContent
+                    && document.documentElement.getAttribute('data-theme') === themeId;
+
+                if (!alreadyLoaded) {
+                    const response = await fetch(`/api/themes/${themeId}`);
+                    const data = await response.json();
+
+                    let styleEl = existing;
+                    if (!styleEl) {
+                        styleEl = document.createElement('style');
+                        styleEl.id = 'dynamic-theme';
+                        document.head.appendChild(styleEl);
+                    }
+                    styleEl.textContent = data.css;
+
+                    document.documentElement.setAttribute('data-theme', themeId);
                 }
-                styleEl.textContent = data.css;
-                
-                // Set data attribute for theme-specific selectors
-                document.documentElement.setAttribute('data-theme', themeId);
                 
                 // Load appropriate Highlight.js theme for code syntax highlighting
                 const highlightTheme = document.getElementById('highlight-theme');
