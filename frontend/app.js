@@ -1220,10 +1220,13 @@ function noteApp() {
             localStorage.setItem('readableLineLength', this.readableLineLength);
         },
         
-        // Hide underscore folders toggle (hides _attachments, _templates, etc. from sidebar)
+        // Hide underscore folders toggle (sidebar tree and graph)
         toggleHideUnderscoreFolders() {
             this.hideUnderscoreFolders = !this.hideUnderscoreFolders;
             localStorage.setItem('hideUnderscoreFolders', this.hideUnderscoreFolders);
+            if (this.showGraph) {
+                this.initGraph();
+            }
         },
 
         // Tab inserts tab toggle (Tab key inserts tab character instead of changing focus)
@@ -9273,13 +9276,21 @@ function noteApp() {
                 return;
             }
             
+            const requestId = (this._graphRequestId || 0) + 1;
+            this._graphRequestId = requestId;
             this.graphLoaded = false;
             
             try {
-                // Fetch graph data from API
-                const response = await fetch('/api/graph');
+                // Full map by default. The sidebar toggle asks the server to
+                // leave out notes stored under any folder whose name starts with "_".
+                const graphUrl = this.hideUnderscoreFolders
+                    ? '/api/graph?include_system_folders=false'
+                    : '/api/graph';
+                const response = await fetch(graphUrl);
+                if (requestId !== this._graphRequestId) return;
                 if (!response.ok) throw new Error('Failed to fetch graph data');
                 const data = await response.json();
+                if (requestId !== this._graphRequestId) return;
                 this.graphData = data;
                 
                 // Get container
@@ -9512,6 +9523,7 @@ function noteApp() {
                 this.addGraphLegend(container, accentPrimary, borderColor, textSecondary);
                 
             } catch (error) {
+                if (requestId !== this._graphRequestId) return;
                 console.error('Failed to initialize graph:', error);
                 this.graphLoaded = true; // Stop loading indicator
             }

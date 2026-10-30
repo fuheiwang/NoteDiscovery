@@ -285,7 +285,7 @@
     "readable_line_length": "Larghezza riga leggibile",
     "readable_line_length_desc": "Limita la larghezza dell'anteprima per una lettura più facile",
     "hide_underscore_folders": "Nascondi cartelle di sistema",
-    "hide_underscore_folders_desc": "Nascondi _attachments, _templates e altre cartelle con underscore",
+    "hide_underscore_folders_desc": "Nascondi _attachments, _templates e altre cartelle con underscore dalla barra laterale e dal grafo",
     "tab_inserts_tab": "Tab inserisce tabulazione",
     "tab_inserts_tab_desc": "Premi Tab per inserire una tabulazione invece di cambiare focus",
     "new_button_action": "Quando clicchi su +",
