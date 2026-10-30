@@ -60,10 +60,6 @@ const LOCAL_SETTINGS = {
     tabInsertsTab: { key: 'tabInsertsTab', type: 'boolean', default: false },
     sidebarPanelCollapsed: { key: 'sidebarPanelCollapsed', type: 'boolean', default: false },
     autoFillNoteTitle: { key: 'autoFillNoteTitle', type: 'boolean', default: false },
-    // Landmark-anchored editor/preview scroll sync. Off by default: percentage sync
-    // is cheaper and adequate for plain prose, while anchoring earns its cost on
-    // notes with images, tables or code blocks.
-    smartScrollSync: { key: 'smartScrollSync', type: 'boolean', default: false },
     // String settings
     sortMode: { key: 'sortMode', type: 'string', default: 'a-z' },
     newButtonAction: {
@@ -486,7 +482,6 @@ function noteApp() {
         newTemplateNoteName: '',
         newButtonAction: 'chooser',
         autoFillNoteTitle: false,
-        smartScrollSync: false,
         lastUsedTemplate: '',
         
         // New note / folder name modal (replaces window.prompt)
@@ -7003,19 +6998,13 @@ function noteApp() {
             // interpolate the editor<->preview mapping accurately across images
             // and other tall blocks. Runs after all other DOM rewrites so the
             // final element identity is what gets tagged.
-            //
-            // Reading the reactive setting here is deliberate: it makes this getter
-            // depend on it, so toggling the preference re-renders and (un)stamps the
-            // anchors without any explicit refresh.
-            if (this.smartScrollSync) {
-                try {
-                    const landmarks = this._scanSourceLandmarks(this.noteContent);
-                    this._annotateSourceAnchors(tempDiv, landmarks);
-                } catch (e) {
-                    // Any anchor-building failure must not break rendering. Anchors
-                    // are an enhancement, not required for content display.
-                    console.warn('scroll-anchor annotation failed:', e);
-                }
+            try {
+                const landmarks = this._scanSourceLandmarks(this.noteContent);
+                this._annotateSourceAnchors(tempDiv, landmarks);
+            } catch (e) {
+                // Any anchor-building failure must not break rendering. Anchors
+                // are an enhancement, not required for content display.
+                console.warn('scroll-anchor annotation failed:', e);
             }
 
             html = tempDiv.innerHTML;
@@ -7801,65 +7790,46 @@ function noteApp() {
                     return;
                 }
 
-                if (this.smartScrollSync) {
-                    // Coalesce bursts into one sync per frame: _getScrollAnchors()
-                    // reads a rect per landmark, so running it per scroll event is
-                    // O(landmarks) layout work at event rate. The frame callback
-                    // re-reads scrollTop, so it always acts on the latest position.
-                    if (this._editorSyncFrame) return;
-                    this._editorSyncFrame = requestAnimationFrame(() => {
-                        this._editorSyncFrame = null;
+                // Coalesce bursts into one sync per frame: _getScrollAnchors()
+                // reads a rect per landmark, so running it per scroll event is
+                // O(landmarks) layout work at event rate. The frame callback
+                // re-reads scrollTop, so it always acts on the latest position.
+                if (this._editorSyncFrame) return;
+                this._editorSyncFrame = requestAnimationFrame(() => {
+                    this._editorSyncFrame = null;
 
-                        // Landmark-anchored sync using EDITOR PERCENTAGE (not line
-                        // index — see _buildAnchorRange for the wrap-safety reason).
-                        // Preview lands at the pixel position interpolated between
-                        // the bracketing landmark pair. Degenerates to legacy
-                        // percentage sync when there are no landmarks.
-                        const editorScrollable = editor.scrollHeight - editor.clientHeight;
-                        if (editorScrollable <= 0) return;
+                    // Landmark-anchored sync using EDITOR PERCENTAGE (not line
+                    // index — see _buildAnchorRange for the wrap-safety reason).
+                    // Preview lands at the pixel position interpolated between
+                    // the bracketing landmark pair. Falls back to percentage
+                    // within a span when a note has no landmarks.
+                    const editorScrollable = editor.scrollHeight - editor.clientHeight;
+                    if (editorScrollable <= 0) return;
 
-                        const editorPct = editor.scrollTop / editorScrollable;
-                        const totalLines = (this.noteContent || '').split('\n').length;
-                        const anchors = this._getScrollAnchors();
+                    const editorPct = editor.scrollTop / editorScrollable;
+                    const totalLines = (this.noteContent || '').split('\n').length;
+                    const anchors = this._getScrollAnchors();
 
-                        // Store as percentage so cross-view-mode restore works even
-                        // when the editor is hidden (display:none, scrollHeight=0).
-                        if (this.currentNote) {
-                            this.noteScrollPositions[this.currentNote] = { editorPct };
-                        }
-
-                        if (preview.scrollHeight - preview.clientHeight > 0) {
-                            const target = this._editorPctToPreviewScrollTop(
-                                editorPct, anchors, editor, preview, totalLines
-                            );
-                            // Only arm the reentrancy guard when the write will actually
-                            // move the pane. Assigning an unchanged scrollTop fires no
-                            // scroll event, which would leave the guard set and make it
-                            // swallow the user's next real scroll.
-                            if (Math.abs(preview.scrollTop - target) >= 1) {
-                                this.isScrolling = true;
-                                preview.scrollTop = target;
-                            }
-                        }
-                    });
-                } else {
-                    // Percentage sync: the default, and what runs when the
-                    // smart-scroll-sync preference is off.
-                    const scrollableHeight = editor.scrollHeight - editor.clientHeight;
-                    if (scrollableHeight <= 0) return;
-
-                    const scrollPercentage = editor.scrollTop / scrollableHeight;
-                    const previewScrollableHeight = preview.scrollHeight - preview.clientHeight;
-
+                    // Store as percentage so cross-view-mode restore works even
+                    // when the editor is hidden (display:none, scrollHeight=0).
                     if (this.currentNote) {
-                        this.noteScrollPositions[this.currentNote] = scrollPercentage;
+                        this.noteScrollPositions[this.currentNote] = { editorPct };
                     }
 
-                    if (previewScrollableHeight > 0) {
-                        this.isScrolling = true;
-                        preview.scrollTop = scrollPercentage * previewScrollableHeight;
+                    if (preview.scrollHeight - preview.clientHeight > 0) {
+                        const target = this._editorPctToPreviewScrollTop(
+                            editorPct, anchors, editor, preview, totalLines
+                        );
+                        // Only arm the reentrancy guard when the write will actually
+                        // move the pane. Assigning an unchanged scrollTop fires no
+                        // scroll event, which would leave the guard set and make it
+                        // swallow the user's next real scroll.
+                        if (Math.abs(preview.scrollTop - target) >= 1) {
+                            this.isScrolling = true;
+                            preview.scrollTop = target;
+                        }
                     }
-                }
+                });
             };
             
             this._previewScrollHandler = () => {
@@ -7868,53 +7838,36 @@ function noteApp() {
                     return;
                 }
 
-                if (this.smartScrollSync) {
-                    // Frame-coalesced for the same reason as the editor handler above.
-                    if (this._previewSyncFrame) return;
-                    this._previewSyncFrame = requestAnimationFrame(() => {
-                        this._previewSyncFrame = null;
+                // Frame-coalesced for the same reason as the editor handler above.
+                if (this._previewSyncFrame) return;
+                this._previewSyncFrame = requestAnimationFrame(() => {
+                    this._previewSyncFrame = null;
 
-                        const previewScrollable = preview.scrollHeight - preview.clientHeight;
-                        if (previewScrollable <= 0) return;
+                    const previewScrollable = preview.scrollHeight - preview.clientHeight;
+                    if (previewScrollable <= 0) return;
 
-                        const anchors = this._getScrollAnchors();
-                        const totalLines = (this.noteContent || '').split('\n').length;
-                        const editorPct = this._previewScrollTopToEditorPct(
-                            preview.scrollTop, anchors, editor, preview, totalLines
-                        );
+                    const anchors = this._getScrollAnchors();
+                    const totalLines = (this.noteContent || '').split('\n').length;
+                    const editorPct = this._previewScrollTopToEditorPct(
+                        preview.scrollTop, anchors, editor, preview, totalLines
+                    );
 
-                        // Capture preview-driven scrolls too — this is the only path
-                        // that fires in preview-only mode, where the textarea is
-                        // display:none and never scrolls.
-                        if (this.currentNote) {
-                            this.noteScrollPositions[this.currentNote] = { editorPct };
-                        }
-
-                        const editorScrollable = editor.scrollHeight - editor.clientHeight;
-                        if (editorScrollable > 0) {
-                            const target = editorPct * editorScrollable;
-                            if (Math.abs(editor.scrollTop - target) >= 1) {
-                                this.isScrolling = true;
-                                editor.scrollTop = target;
-                            }
-                        }
-                    });
-                } else {
-                    const scrollableHeight = preview.scrollHeight - preview.clientHeight;
-                    if (scrollableHeight <= 0) return;
-
-                    const scrollPercentage = preview.scrollTop / scrollableHeight;
-                    const editorScrollableHeight = editor.scrollHeight - editor.clientHeight;
-
+                    // Capture preview-driven scrolls too — this is the only path
+                    // that fires in preview-only mode, where the textarea is
+                    // display:none and never scrolls.
                     if (this.currentNote) {
-                        this.noteScrollPositions[this.currentNote] = scrollPercentage;
+                        this.noteScrollPositions[this.currentNote] = { editorPct };
                     }
 
-                    if (editorScrollableHeight > 0) {
-                        this.isScrolling = true;
-                        editor.scrollTop = scrollPercentage * editorScrollableHeight;
+                    const editorScrollable = editor.scrollHeight - editor.clientHeight;
+                    if (editorScrollable > 0) {
+                        const target = editorPct * editorScrollable;
+                        if (Math.abs(editor.scrollTop - target) >= 1) {
+                            this.isScrolling = true;
+                            editor.scrollTop = target;
+                        }
                     }
-                }
+                });
             };
             
             // Attach new listeners
@@ -8418,9 +8371,8 @@ function noteApp() {
          * Restore the saved scroll position for the current note in both panes. Also
          * called from the viewMode watcher because browsers reset scrollTop when an
          * overflow:auto element goes from display:none back to visible. Accepts either
-         * a legacy number (percentage) or { editorPct } from the anchor path, so the
-         * smart-scroll-sync preference is safe to flip mid-session. Idempotent;
-         * isScrolling keeps the sync handlers from echoing these programmatic writes.
+         * a bare percentage or { editorPct }. Idempotent; isScrolling keeps the sync
+         * handlers from echoing these programmatic writes.
          */
         _restoreNoteScroll() {
             if (!this.currentNote || this.currentMedia) return;
@@ -8449,17 +8401,12 @@ function noteApp() {
             if (preview) {
                 const scrollable = preview.scrollHeight - preview.clientHeight;
                 if (scrollable > 0) {
-                    if (this.smartScrollSync) {
-                        const anchors = this._getScrollAnchors();
-                        const totalLines = (this.noteContent || '').split('\n').length;
-                        this.isScrolling = true;
-                        preview.scrollTop = this._editorPctToPreviewScrollTop(
-                            pct, anchors, editor, preview, totalLines
-                        );
-                    } else {
-                        this.isScrolling = true;
-                        preview.scrollTop = pct * scrollable;
-                    }
+                    const anchors = this._getScrollAnchors();
+                    const totalLines = (this.noteContent || '').split('\n').length;
+                    this.isScrolling = true;
+                    preview.scrollTop = this._editorPctToPreviewScrollTop(
+                        pct, anchors, editor, preview, totalLines
+                    );
                 }
             }
         },
