@@ -418,10 +418,11 @@ GET /api/search?q={query}
 GET /api/search?q={query}&limit=10&offset=0
 ```
 
-Matches note contents by case-insensitive substring, so `q=feat` returns notes
-containing "Features". Each result carries the lines that matched. A query of
-fewer than 2 characters returns no results: it would match most of a vault and
-cannot use the search index.
+Matches note contents by case- and accent-insensitive substring, so `q=feat`
+returns notes containing "Features" and `q=esparragos` returns notes containing
+"Espárragos". Snippets keep the text as written. Each result carries the lines
+that matched. A query of fewer than 2 characters returns no results: it would
+match most of a vault and cannot use the search index.
 
 **Optional Pagination:**
 | Parameter | Type | Default | Description |
