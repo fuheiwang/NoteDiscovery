@@ -2022,13 +2022,37 @@ async def search(
         raise HTTPException(status_code=500, detail=safe_error_message(e, "Search failed"))
 
 
+def _is_under_system_folder(path: str) -> bool:
+    """True when any parent folder of a vault-relative path starts with '_'.
+
+    Paths use forward slashes. The filename itself does not count, so
+    `_draft.md` in a normal folder is a normal note, while
+    `_attachments/readme.md` and `work/_documentation/intro.md` are system notes.
+    """
+    parent = path.rsplit("/", 1)[0] if "/" in path else ""
+    if not parent or parent == ".":
+        return False
+    return any(part.startswith("_") for part in parent.split("/") if part)
+
+
 @api_router.get("/graph", tags=["Graph"])
-async def get_graph():
-    """Graph data (nodes + resolved wikilink/markdown edges) for the visualizer."""
+async def get_graph(include_system_folders: bool = True):
+    """Graph data (nodes + resolved wikilink/markdown edges) for the visualizer.
+
+    `include_system_folders` defaults to true so existing clients keep the full
+    map. When false, notes under a folder whose name starts with `_` are
+    omitted, along with every edge that starts or ends on one of those notes.
+    """
     try:
         if not note_index.get_index().is_built():
             scan_notes_fast_walk(config['storage']['notes_dir'], include_media=False)
         nodes_paths, edges_tuples = note_index.get_graph_data()
+        if not include_system_folders:
+            nodes_paths = [p for p in nodes_paths if not _is_under_system_folder(p)]
+            edges_tuples = [
+                (s, t, et) for (s, t, et) in edges_tuples
+                if not _is_under_system_folder(s) and not _is_under_system_folder(t)
+            ]
         return {
             "nodes": [{"id": p, "label": Path(p).stem} for p in nodes_paths],
             "edges": [{"source": s, "target": t, "type": et} for (s, t, et) in edges_tuples],

@@ -510,8 +510,15 @@ GET /api/plugins/note_stats/calculate?content={markdown_content}
 ### Get Note Graph
 ```http
 GET /api/graph
+GET /api/graph?include_system_folders=false
 ```
 Returns the relationship graph between notes with link detection.
+
+**Query parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `include_system_folders` | `true` | When `false`, notes stored under a folder whose name starts with `_` are omitted, along with every edge that starts or ends on one of those notes. `_attachments/readme.md`, `_templates/meeting.md`, and `work/_documentation/intro.md` are the same case. A file named `_draft.md` in a normal folder is still included. Omitting the parameter returns the full graph. |
 
 **Response:**
 ```json

@@ -285,7 +285,7 @@
     "readable_line_length": "Удобная длина строки",
     "readable_line_length_desc": "Ограничить ширину предпросмотра для удобства чтения",
     "hide_underscore_folders": "Скрыть системные папки",
-    "hide_underscore_folders_desc": "Скрыть _attachments, _templates и другие папки с подчёркиванием",
+    "hide_underscore_folders_desc": "Скрыть _attachments, _templates и другие папки с подчёркиванием на боковой панели и на графе",
     "tab_inserts_tab": "Tab вставляет табуляцию",
     "tab_inserts_tab_desc": "Нажмите Tab для вставки табуляции вместо переключения фокуса",
     "new_button_action": "При нажатии +",
